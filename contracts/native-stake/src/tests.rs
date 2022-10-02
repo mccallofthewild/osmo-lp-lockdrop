@@ -1,8 +1,12 @@
+use std::borrow::BorrowMut;
+
 use crate::msg::{
-    ExecuteMsg, InstantiateMsg, ListStakersResponse, QueryMsg, StakerBalanceResponse,
+    ExecuteMsg, InstantiateMsg, ListStakersResponse, QueryMsg, StakedBalanceAtHeightResponse,
+    StakedValueResponse, StakerBalanceResponse, TotalStakedAtHeightResponse, TotalValueResponse,
 };
 use crate::state::Config;
-use cosmwasm_std::{coins, Addr, Coin, Empty, Uint128};
+use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+use cosmwasm_std::{coins, to_binary, Addr, Coin, Empty, Uint128};
 use cw_controllers::ClaimsResponse;
 use cw_multi_test::{
     custom_app, next_block, App, AppResponse, Contract, ContractWrapper, Executor,
@@ -14,6 +18,45 @@ const ADDR1: &str = "addr1";
 const ADDR2: &str = "addr2";
 const DENOM: &str = "ujuno";
 const INVALID_DENOM: &str = "uinvalid";
+
+fn query_staked_balance<T: Into<String>, U: Into<String>>(
+    app: &App,
+    contract_addr: T,
+    address: U,
+) -> Uint128 {
+    let msg = QueryMsg::StakedBalanceAtHeight {
+        address: address.into(),
+        height: None,
+    };
+    let result: StakedBalanceAtHeightResponse =
+        app.wrap().query_wasm_smart(contract_addr, &msg).unwrap();
+    result.balance
+}
+
+fn query_staked_value<T: Into<String>, U: Into<String>>(
+    app: &App,
+    contract_addr: T,
+    address: U,
+) -> Uint128 {
+    let msg = QueryMsg::StakedValue {
+        address: address.into(),
+    };
+    let result: StakedValueResponse = app.wrap().query_wasm_smart(contract_addr, &msg).unwrap();
+    result.value
+}
+
+fn query_total_value<T: Into<String>>(app: &App, contract_addr: T) -> Uint128 {
+    let msg = QueryMsg::TotalValue {};
+    let result: TotalValueResponse = app.wrap().query_wasm_smart(contract_addr, &msg).unwrap();
+    result.total
+}
+
+fn query_total_staked<T: Into<String>>(app: &App, contract_addr: T) -> Uint128 {
+    let msg = QueryMsg::TotalStakedAtHeight { height: None };
+    let result: TotalStakedAtHeightResponse =
+        app.wrap().query_wasm_smart(contract_addr, &msg).unwrap();
+    result.total
+}
 
 fn staking_contract() -> Box<dyn Contract<Empty>> {
     let contract = ContractWrapper::new(
@@ -91,14 +134,14 @@ fn instantiate_staking(app: &mut App, staking_id: u64, msg: InstantiateMsg) -> A
 
 fn stake_tokens(
     app: &mut App,
-    staking_addr: Addr,
+    staking_addr: &Addr,
     sender: &str,
     amount: u128,
     denom: &str,
 ) -> anyhow::Result<AppResponse> {
     app.execute_contract(
         Addr::unchecked(sender),
-        staking_addr,
+        staking_addr.clone(),
         &ExecuteMsg::Stake {},
         &coins(amount, denom),
     )
@@ -106,13 +149,13 @@ fn stake_tokens(
 
 fn unstake_tokens(
     app: &mut App,
-    staking_addr: Addr,
+    staking_addr: &Addr,
     sender: &str,
     amount: u128,
 ) -> anyhow::Result<AppResponse> {
     app.execute_contract(
         Addr::unchecked(sender),
-        staking_addr,
+        staking_addr.clone(),
         &ExecuteMsg::Unstake {
             amount: Uint128::new(amount),
         },
@@ -161,7 +204,7 @@ fn get_claims(app: &mut App, staking_addr: Addr, address: String) -> ClaimsRespo
         .unwrap()
 }
 
-fn get_balance(app: &mut App, address: &str, denom: &str) -> Uint128 {
+fn get_balance(app: &App, address: &str, denom: &str) -> Uint128 {
     app.wrap().query_balance(address, denom).unwrap().amount
 }
 
@@ -262,7 +305,7 @@ fn test_stake_invalid_denom() {
     );
 
     // Try and stake an invalid denom
-    stake_tokens(&mut app, addr, ADDR1, 100, INVALID_DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR1, 100, INVALID_DENOM).unwrap();
 }
 
 #[test]
@@ -281,7 +324,7 @@ fn test_stake_valid_denom() {
     );
 
     // Try and stake an valid denom
-    stake_tokens(&mut app, addr, ADDR1, 100, DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR1, 100, DENOM).unwrap();
     app.update_block(next_block);
 }
 
@@ -301,7 +344,7 @@ fn test_unstake_none_staked() {
         },
     );
 
-    unstake_tokens(&mut app, addr, ADDR1, 100).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 100).unwrap();
 }
 
 #[test]
@@ -321,11 +364,11 @@ fn test_unstake_invalid_balance() {
     );
 
     // Stake some tokens
-    stake_tokens(&mut app, addr.clone(), ADDR1, 100, DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR1, 100, DENOM).unwrap();
     app.update_block(next_block);
 
     // Try and unstake too many
-    unstake_tokens(&mut app, addr, ADDR1, 200).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 200).unwrap();
 }
 
 #[test]
@@ -344,11 +387,11 @@ fn test_unstake() {
     );
 
     // Stake some tokens
-    stake_tokens(&mut app, addr.clone(), ADDR1, 100, DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR1, 100, DENOM).unwrap();
     app.update_block(next_block);
 
     // Unstake some
-    unstake_tokens(&mut app, addr.clone(), ADDR1, 75).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 75).unwrap();
 
     // Query claims
     let claims = get_claims(&mut app, addr.clone(), ADDR1.to_string());
@@ -356,7 +399,7 @@ fn test_unstake() {
     app.update_block(next_block);
 
     // Unstake the rest
-    unstake_tokens(&mut app, addr.clone(), ADDR1, 25).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 25).unwrap();
 
     // Query claims
     let claims = get_claims(&mut app, addr, ADDR1.to_string());
@@ -379,11 +422,11 @@ fn test_unstake_no_unstaking_duration() {
     );
 
     // Stake some tokens
-    stake_tokens(&mut app, addr.clone(), ADDR1, 100, DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR1, 100, DENOM).unwrap();
     app.update_block(next_block);
 
     // Unstake some tokens
-    unstake_tokens(&mut app, addr.clone(), ADDR1, 75).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 75).unwrap();
 
     app.update_block(next_block);
 
@@ -392,7 +435,7 @@ fn test_unstake_no_unstaking_duration() {
     assert_eq!(balance, Uint128::new(9975));
 
     // Unstake the rest
-    unstake_tokens(&mut app, addr, ADDR1, 25).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 25).unwrap();
 
     let balance = get_balance(&mut app, ADDR1, DENOM);
     // 10000 (initial bal) - 100 (staked) + 75 (unstaked 1) + 25 (unstaked 2) = 10000
@@ -435,11 +478,11 @@ fn test_claim_claim_not_reached() {
     );
 
     // Stake some tokens
-    stake_tokens(&mut app, addr.clone(), ADDR1, 100, DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR1, 100, DENOM).unwrap();
     app.update_block(next_block);
 
     // Unstake them to create the claims
-    unstake_tokens(&mut app, addr.clone(), ADDR1, 100).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 100).unwrap();
     app.update_block(next_block);
 
     // We have a claim but it isnt reached yet so this will still fail
@@ -462,11 +505,11 @@ fn test_claim() {
     );
 
     // Stake some tokens
-    stake_tokens(&mut app, addr.clone(), ADDR1, 100, DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR1, 100, DENOM).unwrap();
     app.update_block(next_block);
 
     // Unstake some to create the claims
-    unstake_tokens(&mut app, addr.clone(), ADDR1, 75).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 75).unwrap();
     app.update_block(|b| {
         b.height += 5;
         b.time = b.time.plus_seconds(25);
@@ -481,7 +524,7 @@ fn test_claim() {
     assert_eq!(balance, Uint128::new(9975));
 
     // Unstake the rest
-    unstake_tokens(&mut app, addr.clone(), ADDR1, 25).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 25).unwrap();
     app.update_block(|b| {
         b.height += 10;
         b.time = b.time.plus_seconds(50);
@@ -667,17 +710,17 @@ fn test_query_claims() {
     assert_eq!(claims.claims.len(), 0);
 
     // Stake some tokens
-    stake_tokens(&mut app, addr.clone(), ADDR1, 100, DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR1, 100, DENOM).unwrap();
     app.update_block(next_block);
 
     // Unstake some tokens
-    unstake_tokens(&mut app, addr.clone(), ADDR1, 25).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 25).unwrap();
     app.update_block(next_block);
 
     let claims = get_claims(&mut app, addr.clone(), ADDR1.to_string());
     assert_eq!(claims.claims.len(), 1);
 
-    unstake_tokens(&mut app, addr.clone(), ADDR1, 25).unwrap();
+    unstake_tokens(&mut app, &addr, ADDR1, 25).unwrap();
     app.update_block(next_block);
 
     let claims = get_claims(&mut app, addr, ADDR1.to_string());
@@ -727,10 +770,10 @@ fn test_query_list_stakers() {
     );
 
     // ADDR1 stakes
-    stake_tokens(&mut app, addr.clone(), ADDR1, 100, DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR1, 100, DENOM).unwrap();
 
     // ADDR2 stakes
-    stake_tokens(&mut app, addr.clone(), ADDR2, 50, DENOM).unwrap();
+    stake_tokens(&mut app, &addr, ADDR2, 50, DENOM).unwrap();
 
     // check entire result set
     let stakers: ListStakersResponse = app
@@ -793,4 +836,270 @@ fn test_query_list_stakers() {
         .unwrap();
 
     assert_eq!(stakers, ListStakersResponse { stakers: vec![] });
+}
+
+fn mock_compounding_app() -> App {
+    custom_app(|r, _a, s| {
+        r.bank
+            .init_balance(
+                s,
+                &Addr::unchecked(DAO_ADDR),
+                vec![
+                    Coin {
+                        denom: DENOM.to_string(),
+                        amount: Uint128::new(10000),
+                    },
+                    Coin {
+                        denom: INVALID_DENOM.to_string(),
+                        amount: Uint128::new(10000),
+                    },
+                ],
+            )
+            .unwrap();
+        r.bank
+            .init_balance(
+                s,
+                &Addr::unchecked(ADDR1),
+                vec![
+                    Coin {
+                        denom: DENOM.to_string(),
+                        amount: Uint128::new(1000),
+                    },
+                    Coin {
+                        denom: INVALID_DENOM.to_string(),
+                        amount: Uint128::new(10000),
+                    },
+                ],
+            )
+            .unwrap();
+        r.bank
+            .init_balance(
+                s,
+                &Addr::unchecked(ADDR2),
+                vec![
+                    Coin {
+                        denom: DENOM.to_string(),
+                        amount: Uint128::new(0),
+                    },
+                    Coin {
+                        denom: INVALID_DENOM.to_string(),
+                        amount: Uint128::new(10000),
+                    },
+                ],
+            )
+            .unwrap();
+    })
+}
+
+#[test]
+fn test_auto_compounding_staking() {
+    let _deps = mock_dependencies();
+    let mut app = mock_compounding_app();
+
+    let _env = mock_env();
+    let staking_id = app.store_code(staking_contract());
+    app.update_block(next_block);
+    let staking_addr = instantiate_staking(
+        &mut app,
+        staking_id,
+        InstantiateMsg {
+            owner: Some(DAO_ADDR.to_string()),
+            manager: Some(ADDR1.to_string()),
+            denom: DENOM.to_string(),
+            unstaking_duration: Some(Duration::Height(5)),
+        },
+    );
+    app.update_block(next_block);
+    // Successful bond
+    stake_tokens(&mut app, &staking_addr, &ADDR1, 100_u128, DENOM).unwrap();
+    app.update_block(next_block);
+    assert_eq!(
+        query_staked_balance(&app, &staking_addr, ADDR1.to_string()),
+        Uint128::from(100u128),
+        "Staked balance should be 100"
+    );
+    assert_eq!(
+        query_total_staked(&app, &staking_addr),
+        Uint128::from(100u128),
+        "Total staked balance should be 100"
+    );
+    assert_eq!(
+        query_staked_value(&app, &staking_addr, ADDR1.to_string()),
+        Uint128::from(100u128),
+        "Staked value should be 100"
+    );
+    assert_eq!(
+        query_total_value(&app, &staking_addr),
+        Uint128::from(100u128),
+        "Total value should be 100"
+    );
+    assert_eq!(get_balance(&mut app, &ADDR1, DENOM), Uint128::from(900u128));
+
+    // Add compounding rewards
+    let _res = app
+        .borrow_mut()
+        .execute_contract(
+            Addr::unchecked(ADDR1),
+            staking_addr.clone(),
+            &ExecuteMsg::Fund {},
+            &coins(100_u128, DENOM),
+        )
+        .unwrap();
+    assert_eq!(
+        query_staked_balance(&app, &staking_addr, ADDR1.to_string()),
+        Uint128::from(100u128),
+        "Staked balance should be 100 after compounding"
+    );
+    assert_eq!(
+        query_total_staked(&app, &staking_addr),
+        Uint128::from(100u128),
+        "Total staked balance should be 100 after compounding"
+    );
+    assert_eq!(
+        query_staked_value(&app, &staking_addr, ADDR1.to_string()),
+        Uint128::from(200u128),
+        "Staked value should be 200 after compounding"
+    );
+    assert_eq!(
+        query_total_value(&app, &staking_addr),
+        Uint128::from(200u128),
+        "Total value should be 200 after compounding"
+    );
+    assert_eq!(
+        get_balance(&mut app, &ADDR1, DENOM),
+        Uint128::from(800u128),
+        "Balance should be 800 after compounding"
+    );
+
+    // Sucessful transfer of unbonded amount
+    let _res = app
+        .borrow_mut()
+        .execute(
+            Addr::unchecked(ADDR1),
+            cosmwasm_std::CosmosMsg::Bank(cosmwasm_std::BankMsg::Send {
+                amount: coins(100_u128, DENOM),
+                to_address: ADDR2.to_string(),
+            }),
+        )
+        .unwrap();
+
+    assert_eq!(
+        get_balance(&mut app, ADDR1, DENOM),
+        Uint128::from(700u128),
+        "Balance should be 700 after transfer"
+    );
+    assert_eq!(
+        get_balance(&mut app, ADDR2, DENOM),
+        Uint128::from(100u128),
+        "Balance should be 100 after transfer"
+    );
+
+    // Addr 2 successful bond
+    stake_tokens(
+        &mut app,
+        &staking_addr,
+        &ADDR2,
+        Uint128::new(100).u128(),
+        DENOM,
+    )
+    .unwrap();
+
+    app.update_block(next_block);
+
+    assert_eq!(
+        query_staked_balance(&app, &staking_addr, ADDR2),
+        Uint128::from(50u128),
+        "Staked balance should be 50"
+    );
+    assert_eq!(
+        query_total_staked(&app, &staking_addr),
+        Uint128::from(150u128),
+        "Total staked balance should be 150"
+    );
+    assert_eq!(
+        query_staked_value(&app, &staking_addr, ADDR2.to_string()),
+        Uint128::from(100u128),
+        "Staked value should be 100"
+    );
+    assert_eq!(
+        query_total_value(&app, &staking_addr),
+        Uint128::from(300u128),
+        "Total value should be 300"
+    );
+    assert_eq!(
+        get_balance(&mut app, ADDR2, DENOM),
+        Uint128::zero(),
+        "Balance should be 0 after staking"
+    );
+
+    // Can't unstake more than you have staked
+    let info = mock_info(ADDR2, &[]);
+    let _err = unstake_tokens(&mut app, &staking_addr, ADDR2, Uint128::new(51).u128()).unwrap_err();
+
+    // Add compounding rewards
+    let _res = app
+        .borrow_mut()
+        .execute_contract(
+            Addr::unchecked(ADDR1),
+            staking_addr.clone(),
+            &ExecuteMsg::Fund {},
+            &coins(90_u128, DENOM),
+        )
+        .unwrap();
+
+    assert_eq!(
+        query_staked_balance(&app, &staking_addr, ADDR1.to_string()),
+        Uint128::from(100u128),
+        "Staked balance should be 100 after compounding the second time"
+    );
+    assert_eq!(
+        query_staked_balance(&app, &staking_addr, ADDR2),
+        Uint128::from(50u128),
+        "Staked balance should be 50 after compounding the second time"
+    );
+    assert_eq!(
+        query_total_staked(&app, &staking_addr),
+        Uint128::from(150u128),
+        "Total staked balance should be 150 after compounding the second time"
+    );
+    assert_eq!(
+        query_staked_value(&app, &staking_addr, ADDR1.to_string()),
+        Uint128::from(260u128),
+        "Staked value should be 260 after compounding the second time"
+    );
+    assert_eq!(
+        query_staked_value(&app, &staking_addr, ADDR2.to_string()),
+        Uint128::from(130u128),
+        "Staked value should be 130 after compounding the second time"
+    );
+    assert_eq!(
+        query_total_value(&app, &staking_addr),
+        Uint128::from(390u128),
+        "Total value should be 390 after compounding the second time"
+    );
+    assert_eq!(
+        get_balance(&app, ADDR1, DENOM),
+        Uint128::from(610u128),
+        "Balance should be 610 after compounding the second time"
+    );
+
+    // Successful unstake
+    let _res = unstake_tokens(&mut app, &staking_addr, ADDR2, Uint128::new(25).u128()).unwrap();
+    app.update_block(next_block);
+
+    assert_eq!(
+        query_staked_balance(&app, &staking_addr, ADDR2),
+        Uint128::from(25u128),
+        "Staked balance should be 25 after unstaking"
+    );
+    assert_eq!(
+        query_total_staked(&app, &staking_addr),
+        Uint128::from(125u128),
+        "Total staked balance should be 125 after unstaking"
+    );
+    assert_eq!(
+        get_balance(&app, ADDR2, DENOM),
+        Uint128::from(65u128),
+        "Balance should be 65 after unstaking"
+    );
 }

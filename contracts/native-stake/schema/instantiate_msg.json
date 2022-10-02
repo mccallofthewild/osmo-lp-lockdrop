@@ -3,9 +3,12 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
-    "token_address"
+    "denom"
   ],
   "properties": {
+    "denom": {
+      "type": "string"
+    },
     "manager": {
       "type": [
         "string",
@@ -17,9 +20,6 @@
         "string",
         "null"
       ]
-    },
-    "token_address": {
-      "type": "string"
     },
     "unstaking_duration": {
       "anyOf": [

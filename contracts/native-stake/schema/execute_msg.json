@@ -5,11 +5,23 @@
     {
       "type": "object",
       "required": [
-        "receive"
+        "fund"
       ],
       "properties": {
-        "receive": {
-          "$ref": "#/definitions/Cw20ReceiveMsg"
+        "fund": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "stake"
+      ],
+      "properties": {
+        "stake": {
+          "type": "object"
         }
       },
       "additionalProperties": false
@@ -124,30 +136,6 @@
     }
   ],
   "definitions": {
-    "Binary": {
-      "description": "Binary is a wrapper around Vec<u8> to add base64 de/serialization with serde. It also adds some helper methods to help encode inline.\n\nThis is only needed as serde-json-{core,wasm} has a horrible encoding for Vec<u8>",
-      "type": "string"
-    },
-    "Cw20ReceiveMsg": {
-      "description": "Cw20ReceiveMsg should be de/serialized under `Receive()` variant in a ExecuteMsg",
-      "type": "object",
-      "required": [
-        "amount",
-        "msg",
-        "sender"
-      ],
-      "properties": {
-        "amount": {
-          "$ref": "#/definitions/Uint128"
-        },
-        "msg": {
-          "$ref": "#/definitions/Binary"
-        },
-        "sender": {
-          "type": "string"
-        }
-      }
-    },
     "Duration": {
       "description": "Duration is a delta of time. You can add it to a BlockInfo or Expiration to move that further in the future. Note that an height-based Duration and a time-based Expiration cannot be combined",
       "oneOf": [

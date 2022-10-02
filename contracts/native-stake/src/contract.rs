@@ -271,6 +271,7 @@ pub fn execute_unstake(
             )?;
             Ok(Response::new()
                 .add_attribute("action", "unstake")
+                .add_submessages(hook_msgs)
                 .add_attribute("from", info.sender)
                 .add_attribute("amount", amount)
                 .add_attribute("claim_duration", format!("{}", duration)))
