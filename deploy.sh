@@ -4,7 +4,7 @@
 #   --network testnet \
 #   --signer-account test4
 
-
+# https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/42619195-fd06-4899-877e-75d16529d11c/d2fwjai-162342a7-6a08-4660-a190-cffb998021fb.jpg/v1/fill/w_792,h_612,q_75,strp/koala_ninja_by_jacobsgrl71_d2fwjai-fullview.jpg?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7ImhlaWdodCI6Ijw9NjEyIiwicGF0aCI6IlwvZlwvNDI2MTkxOTUtZmQwNi00ODk5LTg3N2UtNzVkMTY1MjlkMTFjXC9kMmZ3amFpLTE2MjM0MmE3LTZhMDgtNDY2MC1hMTkwLWNmZmI5OTgwMjFmYi5qcGciLCJ3aWR0aCI6Ijw9NzkyIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmltYWdlLm9wZXJhdGlvbnMiXX0.HxSr7ytM-kTi_JN12keoAioJwopkz-wxYDj7H1GulJo
 beaker wasm deploy osmo-lp-lockdrop \
   --network testnet \
   --signer-account test4 \
