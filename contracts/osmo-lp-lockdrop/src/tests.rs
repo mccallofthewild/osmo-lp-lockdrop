@@ -67,6 +67,15 @@ fn staking_contract() -> Box<dyn Contract<Empty>> {
     Box::new(contract)
 }
 
+fn reward_contract() -> Box<dyn Contract<Empty>> {
+    let contract = ContractWrapper::new(
+        lockdrop_rewards::contract::execute,
+        lockdrop_rewards::contract::instantiate,
+        lockdrop_rewards::contract::query,
+    );
+    Box::new(contract)
+}
+
 fn mock_app() -> App {
     custom_app(|r, _a, s| {
         r.bank
@@ -212,6 +221,7 @@ fn get_balance(app: &App, address: &str, denom: &str) -> Uint128 {
 fn test_instantiate() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     // Populated fields
     let _addr = instantiate_staking(
         &mut app,
@@ -221,6 +231,7 @@ fn test_instantiate() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -233,6 +244,7 @@ fn test_instantiate() {
             manager: None,
             denom: DENOM.to_string(),
             unstaking_duration: None,
+            reward_contract_code_id: reward_id,
         },
     );
 }
@@ -241,6 +253,7 @@ fn test_instantiate() {
 fn test_instantiate_dao_owner() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     // Populated fields
     let addr = instantiate_staking(
         &mut app,
@@ -250,6 +263,7 @@ fn test_instantiate_dao_owner() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -263,6 +277,7 @@ fn test_instantiate_dao_owner() {
 fn test_instantiate_invalid_unstaking_duration() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     // Populated fields
     let _addr = instantiate_staking(
         &mut app,
@@ -272,8 +287,10 @@ fn test_instantiate_invalid_unstaking_duration() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(0)),
+            reward_contract_code_id: reward_id,
         },
     );
+    let reward_id = app.store_code(reward_contract());
 
     // Non populated fields
     let _addr = instantiate_staking(
@@ -284,6 +301,7 @@ fn test_instantiate_invalid_unstaking_duration() {
             manager: None,
             denom: DENOM.to_string(),
             unstaking_duration: None,
+            reward_contract_code_id: reward_id,
         },
     );
 }
@@ -293,6 +311,7 @@ fn test_instantiate_invalid_unstaking_duration() {
 fn test_stake_invalid_denom() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -301,6 +320,7 @@ fn test_stake_invalid_denom() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -312,6 +332,7 @@ fn test_stake_invalid_denom() {
 fn test_stake_valid_denom() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -320,6 +341,7 @@ fn test_stake_valid_denom() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -333,6 +355,7 @@ fn test_stake_valid_denom() {
 fn test_unstake_none_staked() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -341,6 +364,7 @@ fn test_unstake_none_staked() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -352,6 +376,7 @@ fn test_unstake_none_staked() {
 fn test_unstake_invalid_balance() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -360,6 +385,7 @@ fn test_unstake_invalid_balance() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -375,6 +401,7 @@ fn test_unstake_invalid_balance() {
 fn test_unstake() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -383,6 +410,7 @@ fn test_unstake() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -410,6 +438,7 @@ fn test_unstake() {
 fn test_unstake_no_unstaking_duration() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -418,6 +447,7 @@ fn test_unstake_no_unstaking_duration() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: None,
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -447,6 +477,8 @@ fn test_unstake_no_unstaking_duration() {
 fn test_claim_no_claims() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_contract_code_id = app.store_code(reward_contract());
+
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -455,6 +487,7 @@ fn test_claim_no_claims() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id,
         },
     );
 
@@ -466,6 +499,8 @@ fn test_claim_no_claims() {
 fn test_claim_claim_not_reached() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_contract_code_id = app.store_code(reward_contract());
+
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -474,6 +509,7 @@ fn test_claim_claim_not_reached() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id,
         },
     );
 
@@ -493,6 +529,8 @@ fn test_claim_claim_not_reached() {
 fn test_claim() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_contract_code_id = app.store_code(reward_contract());
+
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -501,6 +539,7 @@ fn test_claim() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id,
         },
     );
 
@@ -544,6 +583,8 @@ fn test_claim() {
 fn test_update_config_invalid_sender() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_contract_code_id = app.store_code(reward_contract());
+
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -552,6 +593,7 @@ fn test_update_config_invalid_sender() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id,
         },
     );
 
@@ -572,6 +614,7 @@ fn test_update_config_invalid_sender() {
 fn test_update_config_non_owner_changes_owner() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_contract_code_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -580,6 +623,7 @@ fn test_update_config_non_owner_changes_owner() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id,
         },
     );
 
@@ -591,6 +635,7 @@ fn test_update_config_non_owner_changes_owner() {
 fn test_update_config_as_owner() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -599,6 +644,7 @@ fn test_update_config_as_owner() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -620,6 +666,7 @@ fn test_update_config_as_owner() {
             manager: Some(Addr::unchecked(DAO_ADDR)),
             unstaking_duration: Some(Duration::Height(10)),
             denom: DENOM.to_string(),
+            reward_contract_code_id: reward_id,
         },
         config
     );
@@ -629,6 +676,7 @@ fn test_update_config_as_owner() {
 fn test_update_config_as_manager() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -637,6 +685,7 @@ fn test_update_config_as_manager() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -658,6 +707,7 @@ fn test_update_config_as_manager() {
             manager: Some(Addr::unchecked(ADDR2)),
             unstaking_duration: Some(Duration::Height(10)),
             denom: DENOM.to_string(),
+            reward_contract_code_id: reward_id,
         },
         config
     );
@@ -668,6 +718,7 @@ fn test_update_config_as_manager() {
 fn test_update_config_invalid_duration() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -676,6 +727,7 @@ fn test_update_config_invalid_duration() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -695,6 +747,8 @@ fn test_update_config_invalid_duration() {
 fn test_query_claims() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_contract_code_id = app.store_code(reward_contract());
+
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -703,6 +757,7 @@ fn test_query_claims() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id,
         },
     );
 
@@ -731,6 +786,7 @@ fn test_query_claims() {
 fn test_query_get_config() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_id = app.store_code(reward_contract());
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -739,6 +795,7 @@ fn test_query_get_config() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id: reward_id,
         },
     );
 
@@ -750,6 +807,7 @@ fn test_query_get_config() {
             manager: Some(Addr::unchecked(ADDR1)),
             unstaking_duration: Some(Duration::Height(5)),
             denom: DENOM.to_string(),
+            reward_contract_code_id: reward_id
         }
     )
 }
@@ -758,6 +816,8 @@ fn test_query_get_config() {
 fn test_query_list_stakers() {
     let mut app = mock_app();
     let staking_id = app.store_code(staking_contract());
+    let reward_contract_code_id = app.store_code(reward_contract());
+
     let addr = instantiate_staking(
         &mut app,
         staking_id,
@@ -766,6 +826,7 @@ fn test_query_list_stakers() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id,
         },
     );
 
@@ -898,6 +959,8 @@ fn test_auto_compounding_staking() {
 
     let _env = mock_env();
     let staking_id = app.store_code(staking_contract());
+    let reward_contract_code_id = app.store_code(reward_contract());
+
     app.update_block(next_block);
     let staking_addr = instantiate_staking(
         &mut app,
@@ -907,6 +970,7 @@ fn test_auto_compounding_staking() {
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
             unstaking_duration: Some(Duration::Height(5)),
+            reward_contract_code_id,
         },
     );
     app.update_block(next_block);

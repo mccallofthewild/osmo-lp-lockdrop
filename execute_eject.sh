@@ -1,0 +1,1 @@
+beaker wasm execute osmo-lp-lockdrop --signer-account test1 --raw '{ "eject_and_seed_liquidity": { "seed_denom": "ibc/E6931F78057F7CC5DA0FD6CEF82FF39373A6E0452BF1FD76910B93292CF356C1", "gamm_denom": "gamm/pool/560" } }' --network testnet --funds "5000ibc/E6931F78057F7CC5DA0FD6CEF82FF39373A6E0452BF1FD76910B93292CF356C1"

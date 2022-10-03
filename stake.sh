@@ -1,0 +1,1 @@
+beaker wasm execute osmo-lp-lockdrop --signer-account test1 --raw '{ "stake":{}}' --network testnet --funds "100000gamm/pool/560"

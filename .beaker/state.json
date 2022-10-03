@@ -1,1 +1,29 @@
-{}
+{
+  "testnet": {
+    "native-stake": {
+      "code_id": 2363,
+      "addresses": {
+        "default": "osmo17tcnvvd6uw58ya86am266wymf7u3ms6rel79q6ulcqme5n2568tsrmuhy3"
+      },
+      "proposal": {
+        "store_code": null
+      }
+    },
+    "osmo-lp-lockdrop": {
+      "code_id": 2439,
+      "addresses": {
+        "default": "osmo12mzzvk2acadlyctwps4gz2e6hc0p0ktyy0zc5n9gr046xjvewswseaqec0"
+      },
+      "proposal": {
+        "store_code": null
+      }
+    },
+    "lockdrop-rewards": {
+      "code_id": 2416,
+      "addresses": {},
+      "proposal": {
+        "store_code": null
+      }
+    }
+  }
+}
