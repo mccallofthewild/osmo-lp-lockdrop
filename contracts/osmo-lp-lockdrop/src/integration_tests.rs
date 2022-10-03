@@ -1,6 +1,6 @@
 use cosmwasm_std::Coin;
 use cw_utils::Duration;
-use osmosis_testing::{Account, Gamm, Module, OsmosisTestApp, Wasm};
+use osmosis_testing::{Account, Bank, Gamm, Module, OsmosisTestApp, Wasm};
 
 use crate::msg::{ExecuteMsg, InstantiateMsg};
 
@@ -81,4 +81,15 @@ fn setup() {
         &alice,
     )
     .unwrap();
+
+    let bank = Bank::new(&app);
+    let balances = bank.query_all_balances(&alice.address(), None).unwrap();
+    let useed_balance = balances
+        .balances
+        .iter()
+        .find(|c| c.denom == "useed")
+        .unwrap()
+        .amount
+        .clone();
+    assert_eq!(useed_balance, "1000");
 }

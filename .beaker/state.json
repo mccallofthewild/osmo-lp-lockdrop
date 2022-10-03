@@ -10,9 +10,9 @@
       }
     },
     "osmo-lp-lockdrop": {
-      "code_id": 2439,
+      "code_id": 2487,
       "addresses": {
-        "default": "osmo12mzzvk2acadlyctwps4gz2e6hc0p0ktyy0zc5n9gr046xjvewswseaqec0"
+        "default": "osmo1st3f60fcaf5wux2ysw46whzgkt52f026n3zyslw6xtkh03eq79xqz3hwyp"
       },
       "proposal": {
         "store_code": null

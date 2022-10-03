@@ -1,3 +1,4 @@
+use std::ops::Mul;
 use std::str::FromStr;
 
 #[cfg(not(feature = "library"))]
@@ -613,43 +614,58 @@ pub fn _seed_liquidity(
     let seed_amount_per_pool = seed_amount / Uint128::from(asset_count as u128);
     let seed_amount_remainder =
         seed_amount - (seed_amount_per_pool * Uint128::from(asset_count as u128));
-    let msgs = pool
-        .liquidity
-        .iter()
-        .map(|coin| -> Result<CosmosMsg, StdError> {
-            let balance = deps
-                .querier
-                .query_balance(&env.contract.address, &coin.denom)?;
-            let msg_create_balancer_pool: CosmosMsg = MsgCreateBalancerPool {
-                sender: env.contract.address.to_string(),
-                future_pool_governor: "24h".to_string(),
-                pool_params: Some(PoolParams {
-                    swap_fee: "3000000000000000".to_string(),
-                    exit_fee: "0".to_string(),
-                    smooth_weight_change_params: None,
-                }),
-                pool_assets: vec![
-                    PoolAsset {
-                        token: Some(Coin {
-                            denom: balance.denom,
-                            amount: balance.amount.to_string(),
-                        }),
-                        weight: "100".to_string(),
-                    },
-                    PoolAsset {
-                        token: Some(Coin {
-                            denom: seed_denom.to_string(),
-                            amount: seed_amount_per_pool.to_string(),
-                        }),
-                        weight: "100".to_string(),
-                    },
-                ],
-            }
-            .into();
-            Ok(msg_create_balancer_pool)
-        })
-        .map(|msg| msg)
-        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut msgs: Vec<CosmosMsg> = vec![];
+    let mut pool_creation_fees_to_collect = Uint128::from(asset_count.clone() as u64);
+    let pool_creation_fee = Uint128::from(100000000u128);
+    let mut osmo_fees_remaining = pool_creation_fee.mul(pool_creation_fees_to_collect);
+    for coin in pool.liquidity {
+        let balance = deps
+            .querier
+            .query_balance(&env.contract.address, &coin.denom)?;
+        let balance = if coin.denom == "uosmo" {
+            // subtract pool creation fee
+            let bal = balance
+                .amount
+                .checked_sub(osmo_fees_remaining)
+                .map_err(StdError::overflow)?;
+            osmo_fees_remaining = osmo_fees_remaining
+                .checked_sub(pool_creation_fee)
+                .map_err(StdError::overflow)?;
+            bal
+        } else {
+            balance.amount.clone()
+        };
+        pool_creation_fees_to_collect = pool_creation_fees_to_collect - Uint128::from(1u128);
+        let msg_create_balancer_pool: CosmosMsg = MsgCreateBalancerPool {
+            sender: env.contract.address.to_string(),
+            future_pool_governor: "24h".to_string(),
+            pool_params: Some(PoolParams {
+                swap_fee: "3000000000000000".to_string(),
+                exit_fee: "0".to_string(),
+                smooth_weight_change_params: None,
+            }),
+            pool_assets: vec![
+                PoolAsset {
+                    token: Some(Coin {
+                        denom: coin.denom.clone(),
+                        amount: balance.to_string(),
+                    }),
+                    weight: "100".to_string(),
+                },
+                PoolAsset {
+                    token: Some(Coin {
+                        denom: seed_denom.to_string(),
+                        amount: seed_amount_per_pool.to_string(),
+                    }),
+                    weight: "100".to_string(),
+                },
+            ],
+        }
+        .into();
+        msgs.push(msg_create_balancer_pool);
+    }
+
     let bank_transfer_remainder_msgs: Vec<CosmosMsg<Empty>> = if seed_amount_remainder.is_zero() {
         vec![]
     } else {
