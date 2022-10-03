@@ -20,6 +20,10 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
+    DistributeAllTokens {},
+    DistributeToken {
+        denom: String,
+    },
     FundRewardsContract {
         denom: String,
     },
@@ -63,6 +67,7 @@ pub enum ReceiveMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
+    AllRewardContracts {},
     StakedBalanceAtHeight {
         address: String,
         height: Option<u64>,
@@ -97,6 +102,12 @@ pub enum MigrateMsg {
 pub struct StakedBalanceAtHeightResponse {
     pub balance: Uint128,
     pub height: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct AllRewardContractsResponse {
+    pub reward_contracts: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

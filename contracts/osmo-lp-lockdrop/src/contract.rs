@@ -5,15 +5,15 @@ use std::str::FromStr;
 use cosmwasm_std::entry_point;
 
 use cosmwasm_std::{
-    coins, to_binary, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo, Reply,
-    Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
+    coins, to_binary, Addr, BankMsg, Binary, CosmosMsg, Deps, DepsMut, Empty, Env, MessageInfo,
+    Order, Reply, Response, StdError, StdResult, SubMsg, Uint128, WasmMsg,
 };
 use cw20::Denom;
 
 use crate::hooks::{stake_hook_msgs, unstake_hook_msgs};
 use crate::msg::{
-    ExecuteMsg, GetHooksResponse, InstantiateMsg, ListStakersResponse, QueryMsg,
-    StakedBalanceAtHeightResponse, StakedValueResponse, StakerBalanceResponse,
+    AllRewardContractsResponse, ExecuteMsg, GetHooksResponse, InstantiateMsg, ListStakersResponse,
+    QueryMsg, StakedBalanceAtHeightResponse, StakedValueResponse, StakerBalanceResponse,
     TotalStakedAtHeightResponse, TotalValueResponse,
 };
 use crate::state::{
@@ -83,7 +83,14 @@ pub fn reply(deps: DepsMut, env: Env, msg: Reply) -> Result<Response, ContractEr
     };
 
     REWARD_CONTRACTS_BY_DENOM.save(deps.storage, &denom, &contract_addr)?;
-    Ok(Response::new())
+    let fund_rewards_contract_msg: CosmosMsg = CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: env.contract.address.to_string(),
+        funds: vec![],
+        msg: to_binary(&ExecuteMsg::FundRewardsContract {
+            denom: denom.clone(),
+        })?,
+    });
+    Ok(Response::new().add_message(fund_rewards_contract_msg))
 }
 
 pub fn execute_fund_rewards_contract(
@@ -156,8 +163,10 @@ pub fn execute(
     env: Env,
     info: MessageInfo,
     msg: ExecuteMsg,
-) -> Result<Response<Empty>, ContractError> {
+) -> Result<Response, ContractError> {
     match msg {
+        ExecuteMsg::DistributeAllTokens {} => execute_distribute_all_tokens(deps, env, info),
+        ExecuteMsg::DistributeToken { denom } => execute_distribute_token(deps, env, info, denom),
         ExecuteMsg::FundRewardsContract { denom } => {
             execute_fund_rewards_contract(deps, env, denom)
         }
@@ -428,6 +437,7 @@ pub fn execute_remove_hook(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
+        QueryMsg::AllRewardContracts {} => to_binary(&query_all_reward_contracts(deps, env)?),
         QueryMsg::GetConfig {} => to_binary(&query_config(deps)?),
         QueryMsg::StakedBalanceAtHeight { address, height } => {
             to_binary(&query_staked_balance_at_height(deps, env, address, height)?)
@@ -443,6 +453,18 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
             query_list_stakers(deps, start_after, limit)
         }
     }
+}
+
+pub fn query_all_reward_contracts(deps: Deps, _env: Env) -> StdResult<AllRewardContractsResponse> {
+    let all_reward_contracts_by_denom: Vec<String> = REWARD_CONTRACTS_BY_DENOM
+        .range(deps.storage, None, None, Order::Descending)
+        .collect::<StdResult<Vec<(String, Addr)>>>()?
+        .iter()
+        .map(|(_, v)| v.to_string())
+        .collect();
+    Ok(AllRewardContractsResponse {
+        reward_contracts: all_reward_contracts_by_denom,
+    })
 }
 
 pub fn query_staked_balance_at_height(
@@ -674,6 +696,7 @@ pub fn _seed_liquidity(
             amount: coins(seed_amount_remainder.u128(), seed_denom),
         })]
     };
+
     Ok(Response::new()
         .add_attribute("action", "execute_eject_and_seed_liquidity")
         .add_messages(msgs)
@@ -731,12 +754,37 @@ pub fn _execute_eject(
     Ok(Response::new().add_message(msg_exit_pool))
 }
 
+pub fn execute_distribute_all_tokens(
+    deps: DepsMut,
+    env: Env,
+    info: MessageInfo,
+) -> Result<Response, ContractError> {
+    let bank_balances = deps.querier.query_all_balances(&env.contract.address)?;
+    let mut msgs: Vec<CosmosMsg> = vec![];
+    let config = CONFIG.load(deps.storage)?;
+    for coin in bank_balances {
+        // only distribute external tokens
+        if coin.denom == config.denom {
+            continue;
+        }
+        let distribute_token_wasm_msg = CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: env.contract.address.to_string(),
+            funds: vec![],
+            msg: to_binary(&ExecuteMsg::DistributeToken { denom: coin.denom })?,
+        });
+        msgs.push(distribute_token_wasm_msg);
+    }
+    Ok(Response::new()
+        .add_attribute("action", "execute_distribute_all_tokens")
+        .add_messages(msgs))
+}
+
 pub fn execute_distribute_token(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     denom: String,
-) -> Result<Response<CosmosMsg<Empty>>, ContractError> {
+) -> Result<Response, ContractError> {
     // only allow the contract itself to execute this
     let config = CONFIG.load(deps.storage)?;
     let config_denom = config.denom.clone();
@@ -745,37 +793,31 @@ pub fn execute_distribute_token(
         // can later consider allowing this as a means by which to terminate the pools
         return Err(ContractError::Unauthorized {});
     }
-    let msgs: Vec<SubMsg<CosmosMsg<Empty>>> =
-        if !REWARD_CONTRACTS_BY_DENOM.has(deps.storage, &denom) {
-            // cannot distribute a token that is already being distributed
-            let instantiate_lockdrop_rewards_msg: SubMsg<CosmosMsg<Empty>> =
-                SubMsg::new(CosmosMsg::Wasm(WasmMsg::Instantiate {
-                    code_id: config.reward_contract_code_id,
-                    admin: None,
-                    label: format!("lockdrop_rewards_{}", denom),
-                    msg: to_binary(&lockdrop_rewards::msg::InstantiateMsg {
-                        owner: Some(env.contract.address.to_string()),
-                        manager: Some(env.contract.address.to_string()),
-                        staking_contract: env.contract.address.to_string(),
-                        reward_token: Denom::Native(denom.clone()),
-                        reward_duration: 24,
-                    })?,
-                    funds: vec![],
-                }));
-            vec![instantiate_lockdrop_rewards_msg]
-        } else {
-            vec![]
-        };
-    let fund_rewards_contract_msg: CosmosMsg<_> = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: env.contract.address.to_string(),
-        funds: vec![],
-        msg: to_binary(&ExecuteMsg::FundRewardsContract {
-            denom: denom.clone(),
-        })?,
-    });
+    let msgs: Vec<SubMsg> = if !REWARD_CONTRACTS_BY_DENOM.has(deps.storage, &denom) {
+        // cannot distribute a token that is already being distributed
+        let instantiate_lockdrop_rewards_msg: SubMsg<Empty> = SubMsg::reply_on_success(
+            CosmosMsg::Wasm(WasmMsg::Instantiate {
+                code_id: config.reward_contract_code_id,
+                admin: Some(env.contract.address.to_string()),
+                label: format!("lockdrop_rewards_{}", denom),
+                msg: to_binary(&lockdrop_rewards::msg::InstantiateMsg {
+                    owner: Some(env.contract.address.to_string()),
+                    manager: Some(env.contract.address.to_string()),
+                    staking_contract: env.contract.address.to_string(),
+                    reward_token: Denom::Native(denom.clone()),
+                    reward_duration: 24,
+                })?,
+                funds: vec![],
+            }),
+            1,
+        );
+        vec![instantiate_lockdrop_rewards_msg]
+    } else {
+        vec![]
+    };
 
     Ok(Response::new()
         // submessages are executed first regardless of order here
         .add_submessages(msgs)
-        .add_message(fund_rewards_contract_msg))
+        .add_attribute("action", "distribute_token"))
 }

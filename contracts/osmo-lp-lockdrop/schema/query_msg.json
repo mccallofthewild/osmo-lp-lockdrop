@@ -5,6 +5,18 @@
     {
       "type": "object",
       "required": [
+        "all_reward_contracts"
+      ],
+      "properties": {
+        "all_reward_contracts": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "staked_balance_at_height"
       ],
       "properties": {

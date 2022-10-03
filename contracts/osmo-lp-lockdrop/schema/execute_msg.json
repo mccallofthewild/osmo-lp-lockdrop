@@ -5,11 +5,75 @@
     {
       "type": "object",
       "required": [
+        "distribute_all_tokens"
+      ],
+      "properties": {
+        "distribute_all_tokens": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "distribute_token"
+      ],
+      "properties": {
+        "distribute_token": {
+          "type": "object",
+          "required": [
+            "denom"
+          ],
+          "properties": {
+            "denom": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "fund_rewards_contract"
+      ],
+      "properties": {
+        "fund_rewards_contract": {
+          "type": "object",
+          "required": [
+            "denom"
+          ],
+          "properties": {
+            "denom": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "eject_and_seed_liquidity"
       ],
       "properties": {
         "eject_and_seed_liquidity": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "gamm_denom",
+            "seed_denom"
+          ],
+          "properties": {
+            "gamm_denom": {
+              "type": "string"
+            },
+            "seed_denom": {
+              "type": "string"
+            }
+          }
         }
       },
       "additionalProperties": false
@@ -21,7 +85,15 @@
       ],
       "properties": {
         "eject_liquidity": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "gamm_denom"
+          ],
+          "properties": {
+            "gamm_denom": {
+              "type": "string"
+            }
+          }
         }
       },
       "additionalProperties": false
@@ -33,7 +105,19 @@
       ],
       "properties": {
         "seed_liquidity": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "gamm_denom",
+            "seed_denom"
+          ],
+          "properties": {
+            "gamm_denom": {
+              "type": "string"
+            },
+            "seed_denom": {
+              "type": "string"
+            }
+          }
         }
       },
       "additionalProperties": false
