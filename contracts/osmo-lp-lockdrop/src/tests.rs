@@ -969,7 +969,7 @@ fn test_auto_compounding_staking() {
             owner: Some(DAO_ADDR.to_string()),
             manager: Some(ADDR1.to_string()),
             denom: DENOM.to_string(),
-            unstaking_duration: Some(Duration::Height(5)),
+            unstaking_duration: None,
             reward_contract_code_id,
         },
     );
